@@ -27,7 +27,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./e-commerce-project-backend-project-master/SpringBootSDPProject
-          file: ./e-commerce-project-backend-project-master/SpringBootSDPProjecbackend.Dockerfile
+          file: ./e-commerce-project-backend-project-master/SpringBootSDPProject/backend.Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/github_action_backend:latest
 
