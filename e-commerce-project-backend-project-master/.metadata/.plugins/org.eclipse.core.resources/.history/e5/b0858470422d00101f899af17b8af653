@@ -1,0 +1,970 @@
+Skip to content
+Open sidebar
+
+ChatGPT
+You said:
+package com.klef.fsd.sdp.service;
+
+import com.klef.fsd.sdp.model.Product;
+import com.klef.fsd.sdp.model.Seller;
+import com.klef.fsd.sdp.repository.ProductRepository;
+import com.klef.fsd.sdp.repository.SellerRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+
+@Service
+public class SellerServiceImpl implements SellerService {
+
+    @Autowired
+    private SellerRepository sellerRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    // ✅ For Seller Login
+    @Override
+    public Seller checkSellerLogin(String username, String password) {
+        return sellerRepository.findByUsernameAndPassword(username, password);
+    }
+
+    // ✅ Fetch Seller Profile by ID
+    @Override
+    public Seller getSellerById(int id) {
+        Optional<Seller> seller = sellerRepository.findById(id);
+        return seller.orElse(null);  // If no seller found, return null
+    }
+
+    // ✅ Update Seller Profile
+    @Override
+    public String updateSeller(Seller seller) {
+        Optional<Seller> existingSeller = sellerRepository.findById(seller.getId());
+        if (existingSeller.isPresent()) {
+            sellerRepository.save(seller);  // Update the seller
+            return "Seller profile updated successfully";
+        } else {
+            return "Seller not found";
+        }
+    }
+
+    // ✅ Get all products for all sellers
+    @Override
+    public List<Product> getAllProducts() {
+        return productRepository.findAll();  // Fetch all products
+    }
+
+    // ✅ Get products for a specific seller by sellerId
+    @Override
+    public List<Product> getProductsBySellerId(int sellerId) {
+        return productRepository.findBySellerId(sellerId);  // Fetch products by sellerId
+    }
+
+    // ✅ Delete product by ID
+    @Override
+    public String deleteProduct(int productId) {
+        Optional<Product> product = productRepository.findById(productId);
+        if (product.isPresent()) {
+            productRepository.delete(product.get());  // Delete the product
+            return "Product deleted successfully";
+        } else {
+            return "Product not found";
+        }
+    }
+
+    // ✅ Add a new product
+    @Override
+    public String addProduct(Product product) {
+        productRepository.save(product);  // Save the new product
+        return "Product added successfully";
+    }
+}         solve the error     return productRepository.findBySellerId(sellerId); 
+ChatGPT said:
+The error in this line:
+
+return productRepository.findBySellerId(sellerId);
+is likely because findBySellerId(int sellerId) is not defined in your ProductRepository interface.
+
+✅ Solution:
+You need to define the method findBySellerId in your ProductRepository interface. Here's how you do it:
+
+1. Open your ProductRepository interface.
+package com.klef.fsd.sdp.repository;
+
+import com.klef.fsd.sdp.model.Product;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface ProductRepository extends JpaRepository<Product, Integer> {
+    
+    // ✅ Add this line to fix the error
+    List<Product> findBySellerId(int sellerId);
+}
+2. Make sure your Product entity has a field named sellerId:
+Your Product class should have a sellerId field like this:
+
+@Entity
+public class Product {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private int id;
+
+    private String name;
+    private double price;
+    private String description;
+
+    private int sellerId;  // ✅ Ensure this field exists
+
+    // Getters and setters
+}
+Alternatively, if Product has a Seller object instead of a sellerId (i.e., a relation), update the repository method accordingly:
+
+List<Product> findBySeller(Seller seller);
+Let me know which structure you're using — is Product storing a sellerId as an integer, or is it a reference to a Seller object?
+
+You said:
+
+package com.klef.fsd.sdp.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.klef.fsd.sdp.model.Product;
+import java.util.List;
+
+
+@Repository
+public interface ProductRepository extends JpaRepository<Product,Integer>
+{
+  public List<Product> findByCategory(String category);
+}   give updated code
+ChatGPT said:
+To support fetching products by sellerId, you need to add the corresponding method in your ProductRepository interface.
+
+Here’s your updated ProductRepository code with both findByCategory and findBySellerId methods:
+
+package com.klef.fsd.sdp.repository;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import com.klef.fsd.sdp.model.Product;
+import java.util.List;
+
+@Repository
+public interface ProductRepository extends JpaRepository<Product, Integer>
+{
+    // ✅ Fetch products by category
+    public List<Product> findByCategory(String category);
+    
+    // ✅ Fetch products by seller ID
+    public List<Product> findBySellerId(int sellerId);
+}
+✅ Additional Check:
+Make sure your Product entity has a field like this:
+
+private int sellerId;
+If you're instead using:
+
+@ManyToOne
+private Seller seller;
+then the method should be:
+
+public List<Product> findBySeller(Seller seller);
+Let me know if your Product entity uses sellerId as an int or as a reference to Seller.
+
+You said:
+Uploaded image
+ if seller add products it not display in home page give frontend and backend code
+ChatGPT said:
+If the seller is adding products but they are not showing on the "Your Uploaded Products" page, there are two likely causes:
+
+✅ BACKEND FIXES
+You must ensure:
+
+1. The /seller/products/{sellerId} endpoint exists and works
+// In your SellerController
+@GetMapping("/seller/products/{sellerId}")
+public List<Product> getProductsBySellerId(@PathVariable int sellerId) {
+    return sellerService.getProductsBySellerId(sellerId);
+}
+2. Product is being saved with the correct sellerId
+When adding a product:
+
+@PostMapping("/seller/addproduct")
+public String addProduct(@RequestBody Product product) {
+    return sellerService.addProduct(product);  // sellerId must be set here
+}
+Your frontend must set sellerId when sending the product data to backend.
+
+✅ FRONTEND FIX (React)
+Here's the essential code for the Seller Product View Page:
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+function SellerUploadedProducts() {
+  const [products, setProducts] = useState([]);
+  const sellerId = localStorage.getItem("sellerid"); // Make sure this is set during login
+
+  useEffect(() => {
+    if (sellerId) {
+      axios.get(`http://localhost:8080/seller/products/${sellerId}`)
+        .then(response => {
+          setProducts(response.data);
+        })
+        .catch(error => {
+          console.error("Error fetching products:", error);
+        });
+    }
+  }, [sellerId]);
+
+  return (
+    <div>
+      <h2 style={{ textAlign: "center", margin: "20px" }}>Your Uploaded Products</h2>
+      <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center" }}>
+        {products.length > 0 ? (
+          products.map(product => (
+            <div key={product.id} style={{
+              border: "1px solid #ccc",
+              borderRadius: "10px",
+              padding: "15px",
+              margin: "10px",
+              width: "250px"
+            }}>
+              <img
+                src={`http://localhost:8080/images/${product.imagePath}`} // Assuming image path stored in DB
+                alt={product.name}
+                style={{ width: "100%", height: "200px", objectFit: "cover" }}
+              />
+              <h3>{product.name}</h3>
+              <p>Category: {product.category}</p>
+              <p>Price: ₹{product.price}</p>
+            </div>
+          ))
+        ) : (
+          <p>No products uploaded yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default SellerUploadedProducts;
+✅ Verify Image Serving from Backend
+Add this config to serve product images if they are saved as file paths:
+
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler("/images/**")
+                .addResourceLocations("file:product_images/"); // Adjust to your folder path
+    }
+}
+Would you like me to generate the full controller + React page + upload example for clarity?
+
+You said:
+give backend code
+ChatGPT said:
+You said:
+Access to XMLHttpRequest at 'http://localhost:2004/admin/sellercount' from origin 'http://localhost:2000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
+AdminHome.jsx:21 Error fetching counts: AxiosError {message: 'Network Error', name: 'AxiosError', code: 'ERR_NETWORK', config: {…}, request: XMLHttpRequest, …}
+fetchCounts @ AdminHome.jsx:21
+await in fetchCounts
+(anonymous) @ AdminHome.jsx:25
+commitHookEffectListMount @ chunk-KDCVS43I.js?v=e362771d:16963
+commitPassiveMountOnFiber @ chunk-KDCVS43I.js?v=e362771d:18206
+commitPassiveMountEffects_complete @ chunk-KDCVS43I.js?v=e362771d:18179
+commitPassiveMountEffects_begin @ chunk-KDCVS43I.js?v=e362771d:18169
+commitPassiveMountEffects @ chunk-KDCVS43I.js?v=e362771d:18159
+flushPassiveEffectsImpl @ chunk-KDCVS43I.js?v=e362771d:19543
+flushPassiveEffects @ chunk-KDCVS43I.js?v=e362771d:19500
+(anonymous) @ chunk-KDCVS43I.js?v=e362771d:19381
+workLoop @ chunk-KDCVS43I.js?v=e362771d:197
+flushWork @ chunk-KDCVS43I.js?v=e362771d:176
+performWorkUntilDeadline @ chunk-KDCVS43I.js?v=e362771d:384Understand this error
+AdminHome.jsx:14 
+            
+            
+           GET http://localhost:2004/admin/sellercount net::ERR_FAILED 404 (Not Found)
+dispatchXhrRequest @ axios.js?v=e362771d:1637
+xhr @ axios.js?v=e362771d:1517
+dispatchRequest @ axios.js?v=e362771d:1992
+_request @ axios.js?v=e362771d:2213
+request @ axios.js?v=e362771d:2104
+Axios.<computed> @ axios.js?v=e362771d:2232
+wrap @ axios.js?v=e362771d:8
+fetchCounts @ AdminHome.jsx:14
+await in fetchCounts
+(anonymous) @ AdminHome.jsx:25
+commitHookEffectListMount @ chunk-KDCVS43I.js?v=e362771d:16963
+commitPassiveMountOnFiber @ chunk-KDCVS43I.js?v=e362771d:18206
+commitPassiveMountEffects_complete @ chunk-KDCVS43I.js?v=e362771d:18179
+commitPassiveMountEffects_begin @ chunk-KDCVS43I.js?v=e362771d:18169
+commitPassiveMountEffects @ chunk-KDCVS43I.js?v=e362771d:18159
+flushPassiveEffectsImpl @ chunk-KDCVS43I.js?v=e362771d:19543
+flushPassiveEffects @ chunk-KDCVS43I.js?v=e362771d:19500
+(anonymous) @ chunk-KDCVS43I.js?v=e362771d:19381
+workLoop @ chunk-KDCVS43I.js?v=e362771d:197
+flushWork @ chunk-KDCVS43I.js?v=e362771d:176
+performWorkUntilDeadline @ chunk-KDCVS43I.js?v=e362771d:384Understand this error
+adminhome:1 Access to XMLHttpRequest at 'http://localhost:2004/admin/sellercount' from origin 'http://localhost:2000' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.Understand this error
+AdminHome.jsx:21 Error fetching counts: AxiosError {message: 'Network Error', name: 'AxiosError', code: 'ERR_NETWORK', config: {…}, request: XMLHttpRequest, …}
+fetchCounts @ AdminHome.jsx:21
+await in fetchCounts
+(anonymous) @ AdminHome.jsx:25
+commitHookEffectListMount @ chunk-KDCVS43I.js?v=e362771d:16963
+invokePassiveEffectMountInDEV @ chunk-KDCVS43I.js?v=e362771d:18374
+invokeEffectsInDev @ chunk-KDCVS43I.js?v=e362771d:19754
+commitDoubleInvokeEffectsInDEV @ chunk-KDCVS43I.js?v=e362771d:19739
+flushPassiveEffectsImpl @ chunk-KDCVS43I.js?v=e362771d:19556
+flushPassiveEffects @ chunk-KDCVS43I.js?v=e362771d:19500
+(anonymous) @ chunk-KDCVS43I.js?v=e362771d:19381
+workLoop @ chunk-KDCVS43I.js?v=e362771d:197
+flushWork @ chunk-KDCVS43I.js?v=e362771d:176
+performWorkUntilDeadline @ chunk-KDCVS43I.js?v=e362771d:384Understand this error
+AdminHome.jsx:14 
+            
+            
+           GET http://localhost:2004/admin/sellercount net::ERR_FAILED 404 (Not Found)              import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import config from '../config';
+
+export default function AdminHome() {
+  const [adminCount, setAdminCount] = useState(0);
+  const [sellerCount, setSellerCount] = useState(0);
+  const [customerCount, setCustomerCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const adminRes = await axios.get(${config.url}/admin/admincount);
+        const sellerRes = await axios.get(${config.url}/admin/sellercount);
+        const customerRes = await axios.get(${config.url}/admin/customercount);
+
+        setAdminCount(adminRes.data);
+        setSellerCount(sellerRes.data);
+        setCustomerCount(customerRes.data);
+      } catch (error) {
+        console.error("Error fetching counts:", error);
+      }
+    };
+
+    fetchCounts();
+  }, []);
+
+  return (
+    <div style={{ textAlign: 'center', padding: '30px', backgroundColor: '#f9f9f9', minHeight: '100vh' }}>
+      <h2>Welcome to Admin Dashboard</h2>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: '25px', marginTop: '30px', flexWrap: 'wrap' }}>
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', padding: '25px', width: '200px' }}>
+          <h3 style={{ marginBottom: '10px', color: '#333' }}>Admins</h3>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#6f42c1' }}>{adminCount}</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', padding: '25px', width: '200px' }}>
+          <h3 style={{ marginBottom: '10px', color: '#333' }}>Sellers</h3>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#28a745' }}>{sellerCount}</p>
+        </div>
+        <div style={{ backgroundColor: '#fff', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', padding: '25px', width: '200px' }}>
+          <h3 style={{ marginBottom: '10px', color: '#333' }}>Customers</h3>
+          <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#007bff' }}>{customerCount}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+solve errors
+        
+ChatGPT said:
+You're facing two distinct issues in your React + Spring Boot e-commerce project:
+
+✅ 1. CORS Policy Error
+Error:
+
+Access to XMLHttpRequest at 'http://localhost:2004/admin/sellercount' from origin 'http://localhost:2000' has been blocked by CORS policy
+✅ Solution (Backend - Spring Boot):
+You must allow CORS in your backend controller or globally.
+
+Option 1: Add CORS to Controller
+@CrossOrigin(origins = "http://localhost:2000") // Allow React frontend
+@RestController
+@RequestMapping("/admin")
+public class AdminController {
+
+    @Autowired
+    private AdminService adminService;
+
+    @GetMapping("/admincount")
+    public long getAdminCount() {
+        return adminService.getAdminCount();
+    }
+
+    @GetMapping("/sellercount")
+    public long getSellerCount() {
+        return adminService.getSellerCount();
+    }
+
+    @GetMapping("/customercount")
+    public long getCustomerCount() {
+        return adminService.getCustomerCount();
+    }
+}
+Option 2: Global CORS Config (if you prefer central setup)
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+            .allowedOrigins("http://localhost:2000")
+            .allowedMethods("*")
+            .allowedHeaders("*");
+    }
+}
+❌ 2. HTTP 404 (Not Found) for /admin/sellercount
+This means your backend route does not exist or is incorrect.
+
+✅ Ensure the endpoint exists in your Spring Boot backend:
+AdminService.java
+@Service
+public class AdminService {
+
+    @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
+    private SellerRepository sellerRepository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    public long getAdminCount() {
+        return adminRepository.count();
+    }
+
+    public long getSellerCount() {
+        return sellerRepository.count();
+    }
+
+    public long getCustomerCount() {
+        return customerRepository.count();
+    }
+}
+AdminController.java
+@RestController
+@RequestMapping("/admin")
+@CrossOrigin(origins = "http://localhost:2000")
+public class AdminController {
+
+    @Autowired
+    private AdminService adminService;
+
+    @GetMapping("/admincount")
+    public long getAdminCount() {
+        return adminService.getAdminCount();
+    }
+
+    @GetMapping("/sellercount")
+    public long getSellerCount() {
+        return adminService.getSellerCount();
+    }
+
+    @GetMapping("/customercount")
+    public long getCustomerCount() {
+        return adminService.getCustomerCount();
+    }
+}
+✅ Summary
+Problem	Fix
+CORS error	Add @CrossOrigin(origins = "http://localhost:2000")
+404 Not Found	Ensure /admin/sellercount and other endpoints exist and are mapped correctly
+Would you also like the repository code or the config for database setup?
+
+You said:
+package com.klef.fsd.sdp.controller;
+
+import com.klef.fsd.sdp.model.Customer;
+import com.klef.fsd.sdp.model.Product;
+import com.klef.fsd.sdp.repository.CustomerRepository;
+import com.klef.fsd.sdp.repository.ProductRepository;
+import com.klef.fsd.sdp.service.CustomerService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/customer")
+@CrossOrigin("*")
+public class CustomerController {
+
+    @Autowired
+    private CustomerService customerService;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @GetMapping("/")
+    public String home() {
+        return "FSD SDP Project";
+    }
+
+    // ✅ Customer Registration
+    @PostMapping("/registration")
+    public ResponseEntity<String> customerRegistration(@RequestBody Customer customer) {
+        try {
+            String output = customerService.customerregistration(customer);
+            return ResponseEntity.ok(output);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Customer Registration failed...");
+        }
+    }
+
+    // ✅ Customer Login Check
+    @PostMapping("/checkcustomerlogin")
+    public ResponseEntity<?> checkCustomerLogin(@RequestBody Customer customer) {
+        try {
+            Customer c = customerService.checkcustomerlogin(customer.getUsername(), customer.getPassword());
+            if (c != null) {
+                c.setPassword(null); // Hide password before sending back
+                return ResponseEntity.ok(c);
+            } else {
+                return ResponseEntity.status(401).body("Invalid Username or Password");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
+        }
+    }
+
+    // ✅ Get all products for customer
+    @GetMapping("/products")
+    public List<Product> getAllProducts() {
+        return productRepository.findAll();
+    }
+
+    // ✅ Get customer profile by username
+    @GetMapping("/profile/{username}")
+    public ResponseEntity<?> getCustomerProfile(@PathVariable String username) {
+        try {
+            Optional<Customer> optionalCustomer = customerRepository.findByUsername(username);
+            if (optionalCustomer.isPresent()) {
+                Customer customer = optionalCustomer.get();
+                customer.setPassword(null); // Hide password
+                return ResponseEntity.ok(customer);
+            } else {
+                return ResponseEntity.status(404).body("Customer not found");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error retrieving customer profile: " + e.getMessage());
+        }
+    }
+
+    // ✅ Update customer profile (only editable fields)
+    @PutMapping("/update")
+    public ResponseEntity<?> updateCustomerProfile(@RequestBody Customer updatedCustomer) {
+        try {
+            Optional<Customer> optionalCustomer = customerRepository.findByUsername(updatedCustomer.getUsername());
+            if (optionalCustomer.isPresent()) {
+                Customer existing = optionalCustomer.get();
+
+                // Update only editable fields
+                existing.setName(updatedCustomer.getName());
+                existing.setGender(updatedCustomer.getGender());
+                existing.setDob(updatedCustomer.getDob());
+                existing.setMobileno(updatedCustomer.getMobileno());
+                existing.setLocation(updatedCustomer.getLocation());
+
+                Customer saved = customerRepository.save(existing);
+                saved.setPassword(null); // Hide password
+                return ResponseEntity.ok(saved);
+            } else {
+                return ResponseEntity.status(404).body("Customer not found");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to update profile: " + e.getMessage());
+        }
+    }
+
+    // ✅ Submit support message
+    @PostMapping("/support")
+    public ResponseEntity<String> submitSupport(@RequestBody Map<String, String> data) {
+        try {
+            String name = data.get("name");
+            String email = data.get("email");
+            String message = data.get("message");
+
+            System.out.println("Support Request Received:");
+            System.out.println("Name: " + name);
+            System.out.println("Email: " + email);
+            System.out.println("Message: " + message);
+
+            // You can extend this to save to DB or send email if needed
+
+            return ResponseEntity.ok("Support request received successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error processing support request: " + e.getMessage());
+        }
+    }
+} give updated code
+from above codes
+ChatGPT said:
+Your error logs show two main problems:
+
+✅ 1. CORS Issue
+Error:
+
+Access to XMLHttpRequest at 'http://localhost:2004/admin/sellercount' ... No 'Access-Control-Allow-Origin' header is present
+✅ Solution: You need to add CORS configuration to your AdminController or globally.
+
+✅ 2. 404 Not Found
+Error:
+
+GET http://localhost:2004/admin/sellercount net::ERR_FAILED 404 (Not Found)
+✅ Solution: The endpoint /admin/sellercount doesn't exist. You need to create that endpoint in your backend.
+
+✅ Updated Code for AdminController.java (New)
+package com.klef.fsd.sdp.controller;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+
+import com.klef.fsd.sdp.repository.AdminRepository;
+import com.klef.fsd.sdp.repository.CustomerRepository;
+import com.klef.fsd.sdp.repository.SellerRepository;
+
+@RestController
+@RequestMapping("/admin")
+@CrossOrigin(origins = "*") // ✅ To fix CORS
+public class AdminController {
+
+    @Autowired
+    private AdminRepository adminRepository;
+
+    @Autowired
+    private SellerRepository sellerRepository;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @GetMapping("/admincount")
+    public ResponseEntity<Long> getAdminCount() {
+        return ResponseEntity.ok(adminRepository.count());
+    }
+
+    @GetMapping("/sellercount")
+    public ResponseEntity<Long> getSellerCount() {
+        return ResponseEntity.ok(sellerRepository.count());
+    }
+
+    @GetMapping("/customercount")
+    public ResponseEntity<Long> getCustomerCount() {
+        return ResponseEntity.ok(customerRepository.count());
+    }
+}
+✅ Ensure Repositories Exist:
+You must have these 3 interfaces:
+
+public interface AdminRepository extends JpaRepository<Admin, Integer> {}
+public interface SellerRepository extends JpaRepository<Seller, Integer> {}
+public interface CustomerRepository extends JpaRepository<Customer, Integer> {}
+✅ Also Confirm:
+Your config.js in React points to the correct backend base URL:
+
+// config.js
+export default {
+  url: "http://localhost:2004" // Port matches Spring Boot
+};
+✅ Summary of Fixes:
+Issue	Fix
+CORS blocked	Add @CrossOrigin("*") in AdminController
+404 error	Create /sellercount, /admincount, and /customercount endpoints
+Axios network error	Comes from CORS or missing endpoints
+config.url mismatch	Ensure React config.js points to the correct backend port (2004)
+Would you like the frontend code (AdminHome.jsx) cleaned up or improved further?
+
+You said:
+package com.klef.fsd.sdp.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.klef.fsd.sdp.model.Admin;
+import com.klef.fsd.sdp.model.Customer;
+import com.klef.fsd.sdp.model.Seller;
+import com.klef.fsd.sdp.service.AdminService;
+
+@RestController
+@RequestMapping("/admin")
+@CrossOrigin("*")
+public class AdminController 
+{
+    @Autowired
+    private AdminService adminService;
+
+    @PostMapping("/checkadminlogin")
+    public ResponseEntity<?> checkadminlogin(@RequestBody Admin admin)
+    {
+        try 
+        {
+            Admin a = adminService.checkadminlogin(admin.getUsername(), admin.getPassword());
+
+            if (a != null) 
+            {
+                return ResponseEntity.ok(a); // login successful
+            } 
+            else 
+            {
+                return ResponseEntity.status(401).body("Invalid Username or Password");
+            }
+        } 
+        catch (Exception e) 
+        {
+            return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/viewallcustomers")
+    public ResponseEntity<List<Customer>> viewallcustomers()
+    {
+        List<Customer> customers = adminService.displaycustomers();
+        return ResponseEntity.ok(customers);
+    }
+
+    @DeleteMapping("/deletecustomer")
+    public ResponseEntity<String> deletecustomer(@RequestParam int cid)
+    {
+        try
+        {
+            String output = adminService.deletecustomer(cid);
+            return ResponseEntity.ok(output);
+        }
+        catch (Exception e)
+        {
+            return ResponseEntity.status(500).body("Failed to Delete Customer ... !!");
+        }
+    }
+
+    @PostMapping("/addseller")
+    public ResponseEntity<String> additemseller(@RequestBody Seller seller)
+    {
+        try
+        {
+            String output = adminService.addseller(seller);
+            return ResponseEntity.ok(output);
+        }
+        catch (Exception e)
+        {
+            return ResponseEntity.status(500).body("Failed to Add Item Seller ... !!");
+        }
+    }
+
+    @GetMapping("/viewallsellers")
+    public ResponseEntity<List<Seller>> viewallsellers()
+    {
+        List<Seller> sellers = adminService.displayitemsellers();
+        return ResponseEntity.ok(sellers);
+    }
+
+    @DeleteMapping("/deleteseller")
+    public ResponseEntity<String> deleteseller(@RequestParam int sid)
+    {
+        try
+        {
+            String output = adminService.deleteseller(sid);
+            return ResponseEntity.ok(output);
+        }
+        catch (Exception e)
+        {
+            return ResponseEntity.status(500).body("Failed to Delete Seller ... !!");
+        }
+    }
+
+    // ✅ New endpoint to return admin count (or any dashboard data)
+    @GetMapping("/admincount")
+    public ResponseEntity<Integer> getAdminCount()
+    {
+        try
+        {
+            int count = adminService.getAdminCount(); // You need to implement this in your service
+            return ResponseEntity.ok(count);
+        }
+        catch (Exception e)
+        {
+            return ResponseEntity.status(500).body(0);
+        }
+    }
+}           give updated code
+ChatGPT said:
+Here's your updated AdminController.java with the following enhancements:
+
+✅ Changes & Additions:
+Added @GetMapping("/sellercount") and @GetMapping("/customercount").
+
+Used consistent response types (ResponseEntity<Long> for counts).
+
+Improved exception messages.
+
+Provided a complete and clean controller.
+
+✅ Updated AdminController.java
+package com.klef.fsd.sdp.controller;
+
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.klef.fsd.sdp.model.Admin;
+import com.klef.fsd.sdp.model.Customer;
+import com.klef.fsd.sdp.model.Seller;
+import com.klef.fsd.sdp.service.AdminService;
+
+@RestController
+@RequestMapping("/admin")
+@CrossOrigin("*")
+public class AdminController {
+
+    @Autowired
+    private AdminService adminService;
+
+    // ✅ Admin Login
+    @PostMapping("/checkadminlogin")
+    public ResponseEntity<?> checkadminlogin(@RequestBody Admin admin) {
+        try {
+            Admin a = adminService.checkadminlogin(admin.getUsername(), admin.getPassword());
+            if (a != null) {
+                return ResponseEntity.ok(a);
+            } else {
+                return ResponseEntity.status(401).body("Invalid Username or Password");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
+        }
+    }
+
+    // ✅ View all Customers
+    @GetMapping("/viewallcustomers")
+    public ResponseEntity<List<Customer>> viewallcustomers() {
+        List<Customer> customers = adminService.displaycustomers();
+        return ResponseEntity.ok(customers);
+    }
+
+    // ✅ Delete a Customer
+    @DeleteMapping("/deletecustomer")
+    public ResponseEntity<String> deletecustomer(@RequestParam int cid) {
+        try {
+            String output = adminService.deletecustomer(cid);
+            return ResponseEntity.ok(output);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to Delete Customer: " + e.getMessage());
+        }
+    }
+
+    // ✅ Add Seller
+    @PostMapping("/addseller")
+    public ResponseEntity<String> additemseller(@RequestBody Seller seller) {
+        try {
+            String output = adminService.addseller(seller);
+            return ResponseEntity.ok(output);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to Add Seller: " + e.getMessage());
+        }
+    }
+
+    // ✅ View all Sellers
+    @GetMapping("/viewallsellers")
+    public ResponseEntity<List<Seller>> viewallsellers() {
+        List<Seller> sellers = adminService.displayitemsellers();
+        return ResponseEntity.ok(sellers);
+    }
+
+    // ✅ Delete a Seller
+    @DeleteMapping("/deleteseller")
+    public ResponseEntity<String> deleteseller(@RequestParam int sid) {
+        try {
+            String output = adminService.deleteseller(sid);
+            return ResponseEntity.ok(output);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to Delete Seller: " + e.getMessage());
+        }
+    }
+
+    // ✅ Admin Count
+    @GetMapping("/admincount")
+    public ResponseEntity<Long> getAdminCount() {
+        try {
+            long count = adminService.getAdminCount();
+            return ResponseEntity.ok(count);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(0L);
+        }
+    }
+
+    // ✅ Seller Count
+    @GetMapping("/sellercount")
+    public ResponseEntity<Long> getSellerCount() {
+        try {
+            long count = adminService.getSellerCount();
+            return ResponseEntity.ok(count);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(0L);
+        }
+    }
+
+    // ✅ Customer Count
+    @GetMapping("/customercount")
+    public ResponseEntity<Long> getCustomerCount() {
+        try {
+            long count = adminService.getCustomerCount();
+            return ResponseEntity.ok(count);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(0L);
+        }
+    }
+}
+✅ Also update AdminService.java:
+Make sure your service interface has these methods:
+
+public interface AdminService {
+    Admin checkadminlogin(String uname, String pwd);
+    List<Customer> displaycustomers();
+    String deletecustomer(int cid);
+    String addseller(Seller seller);
+    List<Seller> displayitemsellers();
+    String deleteseller(int sid);
+    
+    long getAdminCount();
+    long getSellerCount();
+    long getCustomerCount();
+}
+And implement them properly in AdminServiceImpl.java using the appropriate repository counts.
+
+Would you like help updating AdminServiceImpl.java next?
+
+
+
+
+
+
+
+
+
+
+
+
+No file chosenNo file chosen
+ChatGPT can make mistakes. Check important info. See Cookie Preferences.

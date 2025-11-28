@@ -1,0 +1,140 @@
+package com.klef.fsd.sdp.controller;
+
+import com.klef.fsd.sdp.model.Customer;
+import com.klef.fsd.sdp.model.Product;
+import com.klef.fsd.sdp.repository.CustomerRepository;
+import com.klef.fsd.sdp.repository.ProductRepository;
+import com.klef.fsd.sdp.service.CustomerService;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+@RestController
+@RequestMapping("/customer")
+@CrossOrigin("*")
+public class CustomerController {
+
+    @Autowired
+    private CustomerService customerService;
+
+    @Autowired
+    private CustomerRepository customerRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    @GetMapping("/")
+    public String home() {
+        return "FSD SDP Project";
+    }
+
+    // ✅ Customer Registration
+    @PostMapping("/registration")
+    public ResponseEntity<String> customerRegistration(@RequestBody Customer customer) {
+        try {
+            String output = customerService.customerregistration(customer);
+            return ResponseEntity.ok(output);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Customer Registration failed...");
+        }
+    }
+
+    // ✅ Customer Login Check
+    @PostMapping("/checkcustomerlogin")
+    public ResponseEntity<?> checkCustomerLogin(@RequestBody Customer customer) {
+        try {
+            Customer c = customerService.checkcustomerlogin(customer.getUsername(), customer.getPassword());
+            if (c != null) {
+                c.setPassword(null); // Hide password before sending back
+                return ResponseEntity.ok(c);
+            } else {
+                return ResponseEntity.status(401).body("Invalid Username or Password");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Login failed: " + e.getMessage());
+        }
+    }
+
+    // ✅ Get all products for customer
+    @GetMapping("/products")
+    public ResponseEntity<List<Product>> getAllProducts() {
+        try {
+            List<Product> products = productRepository.findAll();
+            if (products.isEmpty()) {
+                return ResponseEntity.status(404).body(null);
+            }
+            return ResponseEntity.ok(products);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(null);
+        }
+    }
+
+    // ✅ Get customer profile by username
+    @GetMapping("/profile/{username}")
+    public ResponseEntity<?> getCustomerProfile(@PathVariable String username) {
+        try {
+            Optional<Customer> optionalCustomer = customerRepository.findByUsername(username);
+            if (optionalCustomer.isPresent()) {
+                Customer customer = optionalCustomer.get();
+                customer.setPassword(null); // Hide password
+                return ResponseEntity.ok(customer);
+            } else {
+                return ResponseEntity.status(404).body("Customer not found");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error retrieving customer profile: " + e.getMessage());
+        }
+    }
+
+    // ✅ Update customer profile (only editable fields)
+    @PutMapping("/update")
+    public ResponseEntity<?> updateCustomerProfile(@RequestBody Customer updatedCustomer) {
+        try {
+            Optional<Customer> optionalCustomer = customerRepository.findByUsername(updatedCustomer.getUsername());
+            if (optionalCustomer.isPresent()) {
+                Customer existing = optionalCustomer.get();
+
+                // Update only editable fields
+                existing.setName(updatedCustomer.getName());
+                existing.setGender(updatedCustomer.getGender());
+                existing.setDob(updatedCustomer.getDob());
+                existing.setMobileno(updatedCustomer.getMobileno());
+                existing.setLocation(updatedCustomer.getLocation());
+
+                Customer saved = customerRepository.save(existing);
+                saved.setPassword(null); // Hide password
+                return ResponseEntity.ok(saved);
+            } else {
+                return ResponseEntity.status(404).body("Customer not found");
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Failed to update profile: " + e.getMessage());
+        }
+    }
+
+    // ✅ Submit support message
+    @PostMapping("/support")
+    public ResponseEntity<String> submitSupport(@RequestBody Map<String, String> data) {
+        try {
+            String name = data.get("name");
+            String email = data.get("email");
+            String message = data.get("message");
+
+            System.out.println("Support Request Received:");
+            System.out.println("Name: " + name);
+            System.out.println("Email: " + email);
+            System.out.println("Message: " + message);
+
+            // You can extend this to save to DB or send email if needed
+
+            return ResponseEntity.ok("Support request received successfully.");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error processing support request: " + e.getMessage());
+        }
+    }
+}

@@ -1,0 +1,5 @@
+package com.klef.fsd.sdp.dto;
+
+public class DesignDTO {
+
+}

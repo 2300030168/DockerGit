@@ -1,0 +1,18 @@
+package com.klef.fsd.sdp.service;
+
+import java.util.List;
+
+import com.klef.fsd.sdp.model.Product;
+
+public interface ProductService 
+{
+    String addProduct(Product product);
+
+    List<Product> viewAllProducts();  // Fixed method name for consistency
+
+    Product viewProductById(int pid);
+
+    List<Product> viewProductsByCategory(String category);
+
+    List<Product> viewProductsBySellerId(int sellerId);  // New method for filtering by seller
+}

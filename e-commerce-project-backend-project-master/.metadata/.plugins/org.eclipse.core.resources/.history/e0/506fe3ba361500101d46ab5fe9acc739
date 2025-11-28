@@ -1,0 +1,8 @@
+package com.klef.fsd.sdp.service;
+import com.klef.fsd.sdp.model.Seller;
+
+public interface SellerService {
+
+	public Seller checksellerlogin(String username,String password);
+}
+

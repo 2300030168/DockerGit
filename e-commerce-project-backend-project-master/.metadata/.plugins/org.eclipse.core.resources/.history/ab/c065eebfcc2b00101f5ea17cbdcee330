@@ -1,0 +1,139 @@
+package com.klef.fsd.sdp.controller;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.util.MimeTypeUtils;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.klef.fsd.sdp.dto.ProductDTO;
+import com.klef.fsd.sdp.model.Product;
+import com.klef.fsd.sdp.service.ProductService;
+
+import jakarta.servlet.http.HttpServletResponse;
+
+@RestController
+@RequestMapping("/product")
+@CrossOrigin("*")
+public class ProductController {
+
+    @Autowired
+    private ProductService productService;
+
+    // ✅ Add product with image
+    @PostMapping("/addproduct")
+    public ResponseEntity<String> addProduct(
+            @RequestParam("category") String category,
+            @RequestParam("name") String name,
+            @RequestParam("description") String description,
+            @RequestParam("cost") double cost,
+            @RequestParam(value = "url", required = false) String url,
+            @RequestParam("productimage") MultipartFile file) {
+
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body("Product image is required.");
+            }
+
+            String uploadDir = "product-images";
+            File dir = new File(uploadDir);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+
+            String filename = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+            String absoluteImagePath = uploadDir + File.separator + filename;
+            file.transferTo(new File(absoluteImagePath));
+
+            Product p = new Product();
+            p.setCategory(category);
+            p.setName(name);
+            p.setDescription(description);
+            p.setCost(cost);
+            p.setUrl(url);
+            p.setImagePath(absoluteImagePath);  // Absolute path stored
+
+            String result = productService.addProduct(p);
+            return ResponseEntity.ok(result);
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error uploading product: " + e.getMessage());
+        }
+    }
+
+    // ✅ View all products
+    @GetMapping("/viewallproduct")
+    public ResponseEntity<List<ProductDTO>> viewAllProduct() {
+        List<Product> productList = productService.viewAllProducts();
+        List<ProductDTO> productDTOList = new ArrayList<>();
+
+        for (Product p : productList) {
+            ProductDTO dto = new ProductDTO();
+            dto.setId(p.getId());
+            dto.setCategory(p.getCategory());
+            dto.setName(p.getName());
+            dto.setDescription(p.getDescription());
+            dto.setCost(p.getCost());
+            dto.setUrl(p.getUrl());
+           // dto.setImagePath("/product/displayproductimage?id=" + p.getId()); // Set as API image path
+            productDTOList.add(dto);
+        }
+
+        return ResponseEntity.ok(productDTOList);
+    }
+
+    // ✅ Display product image by ID
+    @GetMapping("/displayproductimage")
+    public void displayProductImage(@RequestParam int id, HttpServletResponse response) throws Exception {
+        Product product = productService.viewProductById(id);
+
+        if (product == null || product.getImagePath() == null) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        File imageFile = new File(product.getImagePath());
+        if (!imageFile.exists()) {
+            response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            return;
+        }
+
+        String mimeType = Files.probeContentType(imageFile.toPath());
+        if (mimeType == null) {
+            mimeType = MimeTypeUtils.APPLICATION_OCTET_STREAM_VALUE;
+        }
+
+        response.setContentType(mimeType);
+        Files.copy(imageFile.toPath(), response.getOutputStream());
+        response.getOutputStream().flush();
+    }
+
+    // ✅ Display product by ID with details
+    @PostMapping("/displayproductbyid")
+    public ResponseEntity<ProductDTO> displayProductById(@RequestParam int pid) {
+        Product p = productService.viewProductById(pid);
+
+        if (p == null) {
+            return ResponseEntity.status(404).body(null);
+        }
+
+        ProductDTO dto = new ProductDTO();
+        dto.setId(p.getId());
+        dto.setCategory(p.getCategory());
+        dto.setName(p.getName());
+        dto.setDescription(p.getDescription());
+        dto.setCost(p.getCost());
+        dto.setUrl(p.getUrl());
+        dto.setImagePath("/product/displayproductimage?id=" + p.getId());
+
+        return ResponseEntity.ok(dto);
+    }
+}

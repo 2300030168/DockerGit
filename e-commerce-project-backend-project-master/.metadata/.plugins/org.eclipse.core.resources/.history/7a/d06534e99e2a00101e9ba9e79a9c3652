@@ -1,0 +1,92 @@
+package com.klef.fsd.sdp.service;
+
+import com.klef.fsd.sdp.model.Product;
+import com.klef.fsd.sdp.model.Seller;
+import com.klef.fsd.sdp.repository.ProductRepository;
+import com.klef.fsd.sdp.repository.SellerRepository;
+
+import jakarta.transaction.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
+@Service
+public class SellerServiceImpl implements SellerService {
+
+    @Autowired
+    private SellerRepository sellerRepository;
+
+    @Autowired
+    private ProductRepository productRepository;
+
+    // ✅ Seller Login
+    @Override
+    public Seller checkSellerLogin(String username, String password) {
+        return sellerRepository.findByUsernameAndPassword(username, password);
+    }
+
+    // ✅ Fetch Seller Profile by ID
+    @Override
+    public Seller getSellerById(int id) {
+        Optional<Seller> sellerOpt = sellerRepository.findById(id);
+        return sellerOpt.orElse(null);
+    }
+
+    // ✅ Update Seller Profile (NEWLY ADDED)
+    @Override
+    public String updateSeller(Seller seller) {
+        Optional<Seller> existingSeller = sellerRepository.findById(seller.getId());
+        if (existingSeller.isPresent()) {
+            sellerRepository.save(seller);  // save() updates if ID exists
+            return "Seller profile updated successfully";
+        } else {
+            return "Seller not found";
+        }
+    }
+
+    // ✅ Add Product
+    @Override
+    public String addProduct(Product product, int sellerId) {
+        Optional<Seller> sellerOpt = sellerRepository.findById(sellerId);
+        if (sellerOpt.isPresent()) {
+            //product.setSeller(sellerOpt.get());
+            productRepository.save(product);
+            return "Product uploaded successfully";
+        } else {
+            return "Seller not found";
+        }
+    }
+
+    // ✅ Get All Products
+    @Override
+    @Transactional
+    public List<Product> getAllProducts() {
+        List<Product> products = productRepository.findAll();
+        //products.forEach(p -> p.setSeller(null)); // Hide seller in response
+        return products;
+    }
+
+    // ✅ Get Products by Seller ID
+    @Override
+    public List<Product> getProductsBySellerId(int sellerId) {
+        //return productRepository.findBySellerId(sellerId)
+               // .stream()
+               // .peek(product -> product.setSeller(null)) // Hide seller details
+                .collect(Collectors.toList());
+    }
+
+    // ✅ Delete Product
+    @Override
+    public String deleteProduct(int productId) {
+        Optional<Product> productOpt = productRepository.findById(productId);
+        if (productOpt.isPresent()) {
+            productRepository.deleteById(productId);
+            return "Product deleted successfully";
+        } else {
+            return "Product not found";
+        }
+    }
+}
